@@ -61,13 +61,13 @@ def save_parsed_data(pdf_data, output_file):
         json.dump(pdf_data, f, indent=4, ensure_ascii=False)
 
 if __name__ == "__main__":
-    pdf1_path = "pdf1.pdf"
-    pdf2_path = "pdf2.pdf"
+    pdf1_path = "ICMOrignal.pdf"
+    pdf2_path = "ICMNew.pdf"
     
     # Parse both PDFs
     pdf1_data = parse_pdf(pdf1_path)
     pdf2_data = parse_pdf(pdf2_path)
     
     # Save parsed data to JSON files
-    save_parsed_data(pdf1_data, "pdf1_data.json")
-    save_parsed_data(pdf2_data, "pdf2_data.json")
+    save_parsed_data(pdf1_data, "ICMOrignal.json")
+    save_parsed_data(pdf2_data, "ICMNew.json")
