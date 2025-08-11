@@ -44,7 +44,7 @@ def extract_json_from_response(response_text):
                 continue
         return None
 
-def compare_with_groq(data1, data2, category, groq_client, model="qwen/qwen3-32b"):
+def compare_with_groq(data1, data2, category, groq_client, model="deepseek-r1-distill-llama-70b"):
     """Compare document elements using Groq API"""
     prompt = f"""
     You are an expert document comparison tool. Compare two sets of {category} data from two PDFs and identify:
@@ -61,8 +61,7 @@ def compare_with_groq(data1, data2, category, groq_client, model="qwen/qwen3-32b
         "position_changes": []
     }}
     """
-    
-    # Prepare the data for comparison
+ 
     comparison_data = {
         "original_data": data1,
         "new_data": data2
@@ -102,7 +101,7 @@ def compare_with_groq(data1, data2, category, groq_client, model="qwen/qwen3-32b
             "position_changes": []
         }
 
-def compare_tables_with_groq(tables1, tables2, groq_client, model="qwen/qwen3-32b"):
+def compare_tables_with_groq(tables1, tables2, groq_client, model="llama-3.1-8b-instant"):
     """Compare tables using Groq API"""
     prompt = """
     Compare two sets of table data from two PDFs and identify:
@@ -306,83 +305,74 @@ def generate_html_report(comparison_results, output_file):
     </div>
     """
     
-    # Add detailed sections for each category
-    for category in ["headings", "subheadings", "body" "tables"]:
-        if category in comparison_results:
-            html_template += f"""
-            <div class="section">
-                <h2>{category.capitalize()} Changes</h2>
-                <div class="changes-container">
-            """
-            
-            if category == "tables":
-                # Tables section
-                for change_type in ["added", "removed"]:
-                    changes = comparison_results[category].get(change_type, [])
-                    if changes:
+    for category in ["headings", "subheadings", "body", "tables"]:
+        html_template += f"""
+        <div class="section">
+            <h2>{category.capitalize()} Changes</h2>
+            <div class="changes-container">
+        """
+        
+        if category == "tables":
+            for change_type in ["added", "removed"]:
+                changes = comparison_results.get(category, {}).get(change_type, [])
+                if changes:
+                    html_template += f"""
+                    <div class="change-type {'added' if change_type == 'added' else 'removed'}">
+                        <h3>{change_type.capitalize()} Tables</h3>
+                    """
+                    for table in changes:
                         html_template += f"""
-                        <div class="change-type {'added' if change_type == 'added' else 'removed'}">
-                            <h3>{change_type.capitalize()} Tables</h3>
+                        <div class="item">
+                            <div class="page-indicator">Page {table.get('page', 'N/A')}</div>
+                            <div class="table-content">
+                                <pre>{html.escape(json.dumps(table.get('tables', []), indent=2))}</pre>
+                            </div>
+                        </div>
                         """
-                        
-                        for table in changes:
-                            html_template += f"""
-                            <div class="item">
-                                <div class="page-indicator">Page {table.get('page', 'N/A')}</div>
-                                <div class="table-content">
-                                    <pre>{html.escape(json.dumps(table.get('tables', []), indent=2))}</pre>
-                                </div>
+                    html_template += "</div>"
+        else:
+            for change_type in ["added", "removed", "font_changes", "position_changes"]:
+                changes = comparison_results.get(category, {}).get(change_type, [])
+                if changes:
+                    html_template += f"""
+                    <div class="change-type {'added' if change_type == 'added' else 'removed' if change_type == 'removed' else 'modified'}">
+                        <h3>{' '.join(change_type.split('_')).title()}</h3>
+                    """
+                    for item in changes:
+                        html_template += """
+                        <div class="item">
+                            <div class="page-indicator">Page """ + str(item.get('page', 'N/A')) + """</div>
+                            <div class="text-content">""" + html.escape(str(item.get('text', ''))) + """</div>
+                        """
+                        if change_type == "font_changes":
+                            html_template += """
+                            <div class="metadata">
+                                Font changed from """ + html.escape(f"{item.get('old_font', '')} ({item.get('old_size', '')}pt)") + """
+                                to """ + html.escape(f"{item.get('new_font', '')} ({item.get('new_size', '')}pt)") + """
                             </div>
                             """
-                        
-                        html_template += "</div>"
-            else:
-                # Headings/subheadings sections
-                for change_type in ["added", "removed", "font_changes", "position_changes"]:
-                    changes = comparison_results[category].get(change_type, [])
-                    if changes:
-                        html_template += f"""
-                        <div class="change-type {'added' if change_type == 'added' else 'removed' if change_type == 'removed' else 'modified'}">
-                            <h3>{' '.join(change_type.split('_')).title()}</h3>
-                        """
-                        
-                        for item in changes:
+                        elif change_type == "position_changes":
                             html_template += """
-                            <div class="item">
-                                <div class="page-indicator">Page """ + str(item.get('page', 'N/A')) + """</div>
-                                <div class="text-content">""" + html.escape(str(item.get('text', ''))) + """</div>
+                            <div class="metadata">
+                                Position changed from """ + html.escape(str(item.get('old_bbox', []))) + """
+                                to """ + html.escape(str(item.get('new_bbox', []))) + """
+                            </div>
                             """
-                            
-                            if change_type == "font_changes":
-                                html_template += """
-                                <div class="metadata">
-                                    Font changed from """ + html.escape(f"{item.get('old_font', '')} ({item.get('old_size', '')}pt)") + """
-                                    to """ + html.escape(f"{item.get('new_font', '')} ({item.get('new_size', '')}pt)") + """
-                                </div>
-                                """
-                            elif change_type == "position_changes":
-                                html_template += """
-                                <div class="metadata">
-                                    Position changed from """ + html.escape(str(item.get('old_bbox', []))) + """
-                                    to """ + html.escape(str(item.get('new_bbox', []))) + """
-                                </div>
-                                """
-                            else:
-                                html_template += """
-                                <div class="metadata">
-                                    Font: """ + html.escape(str(item.get('font', 'N/A'))) + """ (""" + str(item.get('size', 'N/A')) + """pt)<br>
-                                    Bounding Box: """ + html.escape(str(item.get('bbox', []))) + """
-                                </div>
-                                """
-                            
-                            html_template += "</div>"
-                        
+                        else:
+                            html_template += """
+                            <div class="metadata">
+                                Font: """ + html.escape(str(item.get('font', 'N/A'))) + """ (""" + str(item.get('size', 'N/A')) + """pt)<br>
+                                Bounding Box: """ + html.escape(str(item.get('bbox', []))) + """
+                            </div>
+                            """
                         html_template += "</div>"
-            
-            html_template += """
-                </div>
+                    html_template += "</div>"
+        
+        html_template += """
             </div>
-            """
+        </div>
+        """
+
     
     # Close HTML
     html_template += """
